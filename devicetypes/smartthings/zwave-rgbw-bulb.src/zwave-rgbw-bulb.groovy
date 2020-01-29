@@ -122,48 +122,6 @@ private getRGB_NAMES() { [RED, GREEN, BLUE] }
 private getWHITE_NAMES() { [WARM_WHITE, COLD_WHITE] }
 private getCOLOR_NAMES() { RGB_NAMES + WHITE_NAMES }
 
-private def rgbToHSV(red, green, blue) {
-	def hex = colorUtil.rgbToHex(red as int, green as int, blue as int)
-	def hsv = colorUtil.hexToHsv(hex)
-	return [hue: hsv[0], saturation: hsv[1], value: hsv[2]]
-}
-
-private def huesatToRGB(hue, sat) {
-	def color = colorUtil.hsvToHex(Math.round(hue) as int, Math.round(sat) as int)
-	return colorUtil.hexToRgb(color)
-}
-
-private zwaveWhiteToTemp(warmWhite, coldWhite) {
-	warmWhite = warmWhite < WHITE_MIN ? WHITE_MIN : warmWhite > WHITE_MAX ? WHITE_MAX : warmWhite
-	coldWhite = coldWhite < WHITE_MIN ? WHITE_MIN : coldWhite > WHITE_MAX ? WHITE_MAX : coldWhite
-	// Compute temp as concensus between warm white and cold white.
-	def warmTemp = (WHITE_MAX - warmWhite ) * COLOR_TEMP_DIFF / WHITE_MAX + COLOR_TEMP_MIN
-	def coldTemp = coldWhite * COLOR_TEMP_DIFF / WHITE_MAX + COLOR_TEMP_MIN
-	def temp = ((warmTemp + coldTemp) * 0.5) as Integer
-}
-
-private zwaveTempToWarmWhite(temp) {
-	temp = temp < COLOR_TEMP_MIN ? COLOR_TEMP_MIN : temp > COLOR_TEMP_MAX ? COLOR_TEMP_MAX : temp
-	def warmValue = ((COLOR_TEMP_MAX - temp) / COLOR_TEMP_DIFF * WHITE_MAX) as Integer
-}
-
-private zwaveTempToColdWhite(temp) {
-	(WHITE_MAX - zwaveTempToWarmWhite(temp))
-}
-
-private def zwToStColor(red, green, blue, warmWhite, coldWhite) {
-	def stColor = [:]
-	def colors = [red, green, blue]
-	def hexColor = "#" + colors.collect { Integer.toHexString(it).padLeft(2, "0") }.join("")
-	stColor["color"] = hexColor
-	def hsv = rgbToHSV(*colors)
-	stColor["hue"] = hsv.hue
-	stColor["saturation"] = hsv.saturation
-	stColor["colorTemperature"] = zwaveWhiteToTemp(warmWhite, coldWhite);
-	log.debug(stColor)
-	stColor
-}
-
 def updated() {
 	response(refresh())
 }
@@ -208,8 +166,14 @@ def zwaveEvent(physicalgraph.zwave.commands.switchmultilevelv3.SwitchMultilevelR
 def zwaveEvent(physicalgraph.zwave.commands.switchcolorv3.SwitchColorReport cmd) {
 	log.debug "got SwitchColorReport: $cmd"
 	def result = []
-	if (state.staged != null) {
-		state.staged.each{ k, v -> result << createEvent(name: k, value: v) }
+	if (state.staged != null && cmd.colorComponent in RGB_NAMES) {
+		// We use this as a callback from our color setter.
+		// Emit our color update event with our staged state.
+		state.staged.subMap("hue", "saturation", "color").each{ k, v -> result << createEvent(name: k, value: v) }
+	} else if (state.staged != null && cmd.colorComponent in WHITE_NAMES) {
+		// We use this as a callback from our temperature setter.
+		// Emit our color temperature update event with our staged state.
+		state.staged.subMap("colorTemperature").each{ k, v -> result << createEvent(name: k, value: v) }
 	}
 	result
 }
@@ -292,30 +256,44 @@ def setHue(value) {
 def setColor(value) {
 	log.debug "setColor($value)"
 	def rgb
-	if (value.hex) {
-		rgb = value.hex.findAll(/[0-9a-fA-F]{2}/).collect { Integer.parseInt(it, 16) }
-	} else {
-		rgb = huesatToRGB(value.hue, value.saturation)
-	}
 	if (state.staged == null) {
 		state.staged = [:]
 	}
-	state.staged << zwToStColor(rgb[0], rgb[1], rgb[2], 0, 0)
+	if (value.hex) {
+		state.staged << [color: value.hex] // stage ST RGB color attribute
+		def hsv = colorUtil.hexToHsv(value.hex) // convert to HSV
+		state.staged << [hue: hsv[0], saturation: hsv[1]] // stage ST hue and saturation attributes
+		rgb = value.hex.findAll(/[0-9a-fA-F]{2}/).collect { Integer.parseInt(it, 16) } // separate RGB elements for zwave setter
+	} else {
+		state.staged << value.subMap("hue", "saturation") // stage ST hue and saturation attributes
+		def hex = colorUtil.hsvToHex(Math.round(value.hue) as int, Math.round(value.saturation) as int) // convert to hex
+		state.staged << [color: hex] // statge ST RGB color attribute
+		rgb = colorUtil.hexToRgb(hex) // separate RGB elements for zwave setter
+	}
 	def cmds = [zwave.switchColorV3.switchColorSet(red: rgb[0], green: rgb[1], blue: rgb[2], warmWhite: 0, coldWhite: 0),
-		        zwave.switchColorV3.switchColorGet(colorComponent: COLOR_NAMES[0])]
+		        zwave.switchColorV3.switchColorGet(colorComponent: RGB_NAMES[0])]
 	commands(cmds)
+}
+
+private tempToZwaveWarmWhite(temp) {
+	temp = temp < COLOR_TEMP_MIN ? COLOR_TEMP_MIN : temp > COLOR_TEMP_MAX ? COLOR_TEMP_MAX : temp
+	def warmValue = ((COLOR_TEMP_MAX - temp) / COLOR_TEMP_DIFF * WHITE_MAX) as Integer
+}
+
+private tempToZwaveColdWhite(temp) {
+	(WHITE_MAX - tempToZwaveWarmWhite(temp))
 }
 
 def setColorTemperature(temp) {
 	log.debug "setColorTemperature($temp)"
-	def warmValue = zwaveTempToWarmWhite(temp)
-	def coldValue = zwaveTempToColdWhite(temp)
+	def warmValue = tempToZwaveWarmWhite(temp)
+	def coldValue = tempToZwaveColdWhite(temp)
 	if (state.staged == null) {
 		state.staged = [:]
 	}
-	state.staged << zwToStColor(0, 0, 0, warmValue, coldValue)
+	state.staged << [colorTemperature: temp] // stage ST colorTemperature attribute
 	def cmds = [zwave.switchColorV3.switchColorSet(red: 0, green: 0, blue: 0, warmWhite: warmValue, coldWhite: coldValue),
-		        zwave.switchColorV3.switchColorGet(colorComponent: COLOR_NAMES[0])]
+		        zwave.switchColorV3.switchColorGet(colorComponent: WHITE_NAMES[0])]
 	commands(cmds)
 }
 
