@@ -171,11 +171,11 @@ def updated() {
 def installed() {
 	log.debug "installed()..."
 	sendEvent(name: "checkInterval", value: 1860, displayed: false, data: [protocol: "zwave", hubHardwareId: device.hub.hardwareID, offlinePingable: "0"])
-	sendEvent(name: "level", value: 100, unit: "%")
-	sendEvent(name: "colorTemperature", value: COLOR_TEMP_MIN)
-	sendEvent(name: "color", value: "#000000")
-	sendEvent(name: "hue", value: 0)
-	sendEvent(name: "saturation", value: 0)
+	sendEvent(name: "level", value: 100, unit: "%", displayed: false)
+	sendEvent(name: "colorTemperature", value: COLOR_TEMP_MIN, displayed: false)
+	sendEvent(name: "color", value: "#000000", displayed: false)
+	sendEvent(name: "hue", value: 0, dispalyed: false)
+	sendEvent(name: "saturation", value: 0, displayed: false)
 }
 
 def configure() {
