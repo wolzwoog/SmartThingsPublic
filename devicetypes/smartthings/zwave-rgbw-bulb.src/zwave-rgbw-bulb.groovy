@@ -178,13 +178,6 @@ def installed() {
 	sendEvent(name: "saturation", value: 0, displayed: false)
 }
 
-def configure() {
-	commands([
-		// Set the dimming ramp rate
-		zwave.configurationV2.configurationSet(parameterNumber: 0x10, size: 1, scaledConfigurationValue: 5)
-	])
-}
-
 def parse(description) {
 	def result = null
 	if (description != "updated") {
