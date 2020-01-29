@@ -128,7 +128,7 @@ def updated() {
 
 def installed() {
 	log.debug "installed()..."
-	sendEvent(name: "checkInterval", value: 1860, displayed: false, data: [protocol: "zwave", hubHardwareId: device.hub.hardwareID, offlinePingable: "0"])
+	sendEvent(name: "checkInterval", value: 1860, displayed: false, data: [protocol: "zwave", hubHardwareId: device.hub.hardwareID])
 	sendEvent(name: "level", value: 100, unit: "%", displayed: false)
 	sendEvent(name: "colorTemperature", value: COLOR_TEMP_MIN, displayed: false)
 	sendEvent(name: "color", value: "#000000", displayed: false)
@@ -159,7 +159,6 @@ def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicSet cmd) {
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.switchmultilevelv3.SwitchMultilevelReport cmd) {
-	unschedule(offlinePing)
 	dimmerEvents(cmd)
 }
 
@@ -220,14 +219,8 @@ def refresh() {
 
 def ping() {
 	log.debug "ping().."
-	unschedule(offlinePing)
 	runEvery30Minutes(offlinePing)
 	command(zwave.switchMultilevelV3.switchMultilevelGet())
-}
-
-def offlinePing() {
-	log.debug "offlinePing()..."
-	sendHubCommand(new physicalgraph.device.HubAction(command(zwave.switchMultilevelV3.switchMultilevelGet())))
 }
 
 def setLevel(level) {
