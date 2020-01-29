@@ -61,16 +61,16 @@ metadata {
 		fingerprint deviceId: "0x1102", inClusters: "0x26,0x33", deviceJoinName: "Z-Wave RGBW Bulb"
 
 		// GENERIC_TYPE_SWITCH_MULTILEVEL:SPECIFIC_TYPE_POWER_SWITCH_MULTILEVEL
-		// dimmable, color control; supports security command class.
+		// dimmable, color control
 		//
 		// Note: explicitly delimiting application command classes as secure with 0xF1,0x00
-		fingerprint deviceId: "0x1101", inClusters: "0x98,0xF1,0x00,0x26,0x33", deviceJoinName: "Z-Wave RGBW Bulb"
+		fingerprint deviceId: "0x1101", inClusters: "0xF1,0x00,0x26,0x33", deviceJoinName: "Z-Wave RGBW Bulb"
 
 		// GENERIC_TYPE_SWITCH_MULTILEVEL:SPECIFIC_TYPE_COLOR_TUNABLE_MULTILEVEL
-		// dimmable, color control; supports security command class.
+		// dimmable, color control
 		//
 		// Note: explicitly delimiting application command classes as secure with 0xF1,0x00
-		fingerprint deviceId: "0x1102", inClusters: "0x98,0xF1,0x00,0x26,0x33", deviceJoinName: "Z-Wave RGBW Bulb"
+		fingerprint deviceId: "0x1102", inClusters: "0xF1,0x00,0x26,0x33", deviceJoinName: "Z-Wave RGBW Bulb"
 
 		// Illumin LZW42 RGBW Bulb.
 		//
